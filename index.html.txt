@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>寶石貪食蛇 - 五關挑戰</title>
+
+<style>
+body{
+    font-family:Arial, sans-serif;
+    background:#111827;
+    color:white;
+    text-align:center;
+    margin:0;
+}
+
+h1{
+    margin-top:15px;
+}
+
+#gameContainer{
+    display:flex;
+    justify-content:center;
+    gap:20px;
+    flex-wrap:wrap;
+}
+
+canvas{
+    background:#000;
+    border:3px solid #10b981;
+}
+
+#panel{
+    width:250px;
+    text-align:left;
+}
+
+.card{
+    background:#1f2937;
+    padding:12px;
+    margin-bottom:10px;
+    border-radius:10px;
+}
+
+button{
+    padding:10px 20px;
+    border:none;
+    border-radius:8px;
+    background:#10b981;
+    color:white;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#059669;
+}
+
+#message{
+    font-size:20px;
+    color:gold;
+    margin:10px;
+}
+
+ol{
+    padding-left:20px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>💎 寶石貪食蛇 - 五關挑戰</h1>
+
+<div id="message"></div>
+
+<div id="gameContainer">
+
+    <canvas id="game" width="500" height="500"></canvas>
+
+    <div id="panel">
+
+        <div class="card">
+            <h3>遊戲資訊</h3>
+            <p>關卡：<span id="level">1</span>/5</p>
+            <p>分數：<span id="score">0</span></p>
+            <p>時間：<span id="timer">0</span> 秒</p>
+            <p>目標寶石：<span id="target">5</span></p>
+            <p>已收集：<span id="gems">0</span></p>
+        </div>
+
+        <div class="card">
+            <button onclick="startGame()">開始遊戲</button>
+        </div>
+
+        <div class="card">
+            <h3>🏆 前五名排行榜</h3>
+            <ol id="leaderboard"></ol>
+        </div>
+
+        <div class="card">
+            <h3>操作方式</h3>
+            <p>↑ ↓ ← → 控制方向</p>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const box = 25;
+
+let snake;
+let direction;
+let food;
+let score;
+let level;
+let gemsCollected;
+let timer;
+let timerInterval;
+let gameLoop;
+
+const levelTargets = [5,10,15,20,25];
+
+function createFood(){
+    food={
+        x:Math.floor(Math.random()*20)*box,
+        y:Math.floor(Math.random()*20)*box
+    };
+}
+
+function startGame(){
+
+    clearInterval(timerInterval);
+    clearInterval(gameLoop);
+
+    snake=[{x:250,y:250}];
+    direction="RIGHT";
+
+    score=0;
+    level=1;
+    gemsCollected=0;
+    timer=0;
+
+    createFood();
+
+    updateUI();
+
+    timerInterval=setInterval(()=>{
+        timer++;
+        document.getElementById("timer").textContent=timer;
+    },1000);
+
+    gameLoop=setInterval(draw,120);
+
+    document.getElementById("message").textContent="";
+}
+
+document.addEventListener("keydown",(e)=>{
+
+    if(e.key==="ArrowUp" && direction!=="DOWN")
+        direction="UP";
+
+    if(e.key==="ArrowDown" && direction!=="UP")
+        direction="DOWN";
+
+    if(e.key==="ArrowLeft" && direction!=="RIGHT")
+        direction="LEFT";
+
+    if(e.key==="ArrowRight" && direction!=="LEFT")
+        direction="RIGHT";
+});
+
+function draw(){
+
+    ctx.fillStyle="black";
+    ctx.fillRect(0,0,500,500);
+
+    snake.forEach((segment,index)=>{
+
+        ctx.fillStyle=index===0?"#10b981":"#34d399";
+        ctx.fillRect(segment.x,segment.y,box,box);
+
+    });
+
+    //寶石
+    ctx.fillStyle="cyan";
+    ctx.beginPath();
+    ctx.arc(food.x+12,food.y+12,10,0,Math.PI*2);
+    ctx.fill();
+
+    let headX=snake[0].x;
+    let headY=snake[0].y;
+
+    if(direction==="UP") headY-=box;
+    if(direction==="DOWN") headY+=box;
+    if(direction==="LEFT") headX-=box;
+    if(direction==="RIGHT") headX+=box;
+
+    //吃寶石
+    if(headX===food.x && headY===food.y){
+
+        score+=10;
+        gemsCollected++;
+
+        createFood();
+
+        if(gemsCollected>=levelTargets[level-1]){
+
+            nextLevel();
+            return;
+        }
+
+    }else{
+        snake.pop();
+    }
+
+    const newHead={x:headX,y:headY};
+
+    //撞牆
+    if(
+        headX<0 ||
+        headY<0 ||
+        headX>=500 ||
+        headY>=500
+    ){
+        gameOver();
+        return;
+    }
+
+    //撞自己
+    for(let s of snake){
+
+        if(s.x===headX && s.y===headY){
+            gameOver();
+            return;
+        }
+    }
+
+    snake.unshift(newHead);
+
+    updateUI();
+}
+
+function nextLevel(){
+
+    if(level===5){
+
+        clearInterval(gameLoop);
+        clearInterval(timerInterval);
+
+        document.getElementById("message").textContent=
+        "🎉 恭喜完成所有關卡！";
+
+        saveScore();
+        return;
+    }
+
+    level++;
+    gemsCollected=0;
+
+    document.getElementById("message").textContent=
+    `🚀 進入第 ${level} 關`;
+
+    snake=[{x:250,y:250}];
+    direction="RIGHT";
+
+    createFood();
+
+    updateUI();
+}
+
+function updateUI(){
+
+    document.getElementById("score").textContent=score;
+    document.getElementById("level").textContent=level;
+    document.getElementById("gems").textContent=gemsCollected;
+    document.getElementById("target").textContent=
+    levelTargets[level-1];
+}
+
+function gameOver(){
+
+    clearInterval(gameLoop);
+    clearInterval(timerInterval);
+
+    document.getElementById("message").textContent=
+    "💀 遊戲結束";
+
+    saveScore();
+}
+
+function saveScore(){
+
+    let name=prompt("請輸入玩家名稱");
+
+    if(!name) name="匿名玩家";
+
+    let scores=
+    JSON.parse(localStorage.getItem("snakeLeaderboard"))||[];
+
+    scores.push({
+        name,
+        score,
+        time:timer
+    });
+
+    scores.sort((a,b)=>{
+
+        if(b.score!==a.score)
+            return b.score-a.score;
+
+        return a.time-b.time;
+    });
+
+    scores=scores.slice(0,5);
+
+    localStorage.setItem(
+        "snakeLeaderboard",
+        JSON.stringify(scores)
+    );
+
+    renderLeaderboard();
+}
+
+function renderLeaderboard(){
+
+    let scores=
+    JSON.parse(localStorage.getItem("snakeLeaderboard"))||[];
+
+    const list=
+    document.getElementById("leaderboard");
+
+    list.innerHTML="";
+
+    scores.forEach(item=>{
+
+        const li=document.createElement("li");
+
+        li.textContent=
+        `${item.name} - ${item.score}分 (${item.time}秒)`;
+
+        list.appendChild(li);
+    });
+}
+
+renderLeaderboard();
+
+</script>
+
+</body>
+</html>
